@@ -1,0 +1,12 @@
+@page { size: A4 landscape; margin: 10mm; }
+
+@media print {
+  .no-print { display: none !important; }
+  .avoid-break { break-inside: avoid; }
+  .sheet-page { break-after: page; border: 0 !important; padding: 0 !important; }
+  .sheet-page:last-child { break-after: auto; }
+  .print-root { padding: 0 !important; max-width: none !important; }
+  .print-scroll { overflow: visible !important; height: auto !important; }
+  html, body, #root { height: auto !important; overflow: visible !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
