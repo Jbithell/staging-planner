@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Anchor, Center, Image, Tooltip } from "@mantine/core";
+import { Anchor, Center, Group, Image, Text, Tooltip } from "@mantine/core";
 import { IconExternalLink, IconPackage } from "@tabler/icons-react";
 import { ITEMS, imageUrl, thomannUrl } from "../catalogue";
 
@@ -20,5 +20,19 @@ export function ThomannLink({ no, children, size = "xs" }: { no: string; childre
         {children ?? <>{no} <IconExternalLink size={11} style={{ verticalAlign: -1 }} /></>}
       </Anchor>
     </Tooltip>
+  );
+}
+
+/** Links to the other Thomann packs that sell the same part. */
+export function AlsoSold({ no }: { no: string }) {
+  const also = ITEMS[no]?.also;
+  if (!also?.length) return null;
+  return (
+    <Group gap={6} wrap="wrap">
+      <Text size="xs" c="dimmed">Also sold as:</Text>
+      {also.map(([n, label]) => (
+        <Anchor key={n} size="xs" href={thomannUrl({ no: n })} target="_blank" rel="noopener noreferrer">{label} ({n})</Anchor>
+      ))}
+    </Group>
   );
 }

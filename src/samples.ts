@@ -10,24 +10,24 @@ const plan = (name: string, notes: string, platforms: Platform[], rails: Rail[])
   id: uid(), name, notes, venueId: null, audience: "top", platforms, rails, stairs: [],
 });
 
-/** The three layouts from the original hand-drawn sketches. */
+/** Three example layouts to start from. */
 export function samplePlans(): Plan[] {
-  const aristocats = plan("Aristocats: one long stage", "All at 30cm stage height.",
+  const long = plan("One long stage", "All at 30cm stage height.",
     [0, 200, 400, 600, 800].flatMap((x) => [plat(P2, x, 0, L30), plat(P2, x, 100, L30)]),
     [...[0, 200, 400, 600, 800].map((x) => rail(R2, x, 200, "h")), rail(R2, 0, 0, "v"), rail(R2, 1000, 0, "v")]);
 
-  const thrust = plan("Thrust (Playhouse Apprentice inspired)", "All at 30cm stage height. Audience on three sides.",
+  const thrust = plan("Thrust", "All at 30cm stage height. Audience on three sides.",
     [0, 100, 200, 300].flatMap((y) => [plat(P2, 0, y, L30), plat(P2, 200, y, L30)]),
     [rail(R2, 0, 400, "h"), rail(R2, 200, 400, "h")]);
 
-  const rats = plan("Rats: two stages each with two tiers", "Outer platforms at 30cm, inner tiers at 60cm.",
+  const twoStages = plan("Two stages, each with two tiers", "Outer platforms at 30cm, inner tiers at 60cm.",
     [
       plat(P2, 0, 0, L30), plat(P2, 0, 100, L60), plat(P2, 0, 200, L60), plat(P1, 200, 0, L30), plat(P2, 200, 100, L30, 90),
       plat(P1, 900, 0, L30), plat(P2, 900, 100, L30, 90), plat(P2, 1000, 0, L30), plat(P2, 1000, 100, L60), plat(P2, 1000, 200, L60),
     ],
     [rail(R2, 0, 300, "h"), rail(R1, 200, 300, "h"), rail(R2, 0, 100, "v"), rail(R1, 900, 300, "h"), rail(R2, 1000, 300, "h"), rail(R2, 1200, 100, "v")]);
 
-  return [aristocats, thrust, rats];
+  return [long, thrust, twoStages];
 }
 
 export function emptyPlan(name: string, venueId: string | null = null): Plan {

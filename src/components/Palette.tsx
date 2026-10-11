@@ -1,14 +1,14 @@
 import { Alert, Badge, Button, Group, Paper, Select, SegmentedControl, Stack, Text, Tooltip, UnstyledButton } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { useLocalStorage } from "@mantine/hooks";
-import { IconBulb, IconChevronDown, IconChevronUp, IconHandClick, IconMap, IconStairs, IconFence } from "@tabler/icons-react";
+import { IconBulb, IconChevronDown, IconChevronUp, IconFence, IconLayoutGrid, IconMap, IconStairs } from "@tabler/icons-react";
 import { CATALOGUE, ITEMS, STAIRS } from "../catalogue";
 import type { Plan, Platform, Project, Side, Tool } from "../types";
 import type { Analysis } from "../lib/analysis";
 import { remaining } from "../lib/bom";
 import { footprint, polysOverlap } from "../lib/geometry";
 import { uid } from "../lib/util";
-import { select, setProject, setStairKind, setTool, updatePlan, useStore } from "../store";
+import { select, setProject, setRailItem, setStairKind, setTool, updatePlan, useStore } from "../store";
 import { DRAG_MIME, defaultSupport, freeSpot } from "./PlanView";
 import { ItemThumb, ThomannLink } from "./ItemThumb";
 
@@ -23,27 +23,27 @@ function addPlatform(project: Project, plan: Plan, a: Analysis, no: string) {
   if (updatePlan((pl) => ({ ...pl, platforms: [...pl.platforms, p] }))) select([p.id]);
 }
 
-function PlatformCard({ project, plan, a, no }: { project: Project; plan: Plan; a: Analysis; no: string }) {
-  const it = ITEMS[no];
-  const free = remaining(project, plan, a, no);
-  const usable = free > 0 || project.allowOverInventory;
+/** A part with its Thomann photo: platforms to add, or the handrail / stairs the tool will place. */
+function PartCard({ no, title, subtitle, free, active, usable, tooltip, onClick, dragNo }: {
+  no: string; title: string; subtitle: React.ReactNode; free: number; active?: boolean; usable: boolean; tooltip: string; onClick: () => void; dragNo?: string;
+}) {
   return (
-    <Tooltip label={usable ? "Click to add, or drag onto the plan" : "You don't own any more of these. Add them in “Parts I own”, or turn on “Plan beyond what I own”."} openDelay={300} multiline w={220}>
+    <Tooltip label={tooltip} openDelay={300} multiline w={220}>
       <UnstyledButton
-        draggable={usable}
-        onDragStart={(e) => { e.dataTransfer.setData(DRAG_MIME, no); e.dataTransfer.effectAllowed = "copy"; }}
-        onClick={() => usable ? addPlatform(project, plan, a, no) : notifications.show({ color: "orange", message: `You have no ${it.short} platforms left. Add more in “Parts I own”, or turn on “Plan beyond what I own”.` })}
-        style={{ opacity: usable ? 1 : 0.5, cursor: usable ? "grab" : "not-allowed" }}
+        draggable={!!dragNo && usable}
+        onDragStart={(e) => { if (dragNo) { e.dataTransfer.setData(DRAG_MIME, dragNo); e.dataTransfer.effectAllowed = "copy"; } }}
+        onClick={onClick}
+        style={{ opacity: usable ? 1 : 0.5, cursor: !usable ? "not-allowed" : dragNo ? "grab" : "pointer" }}
       >
-        <Paper withBorder p={6} radius="sm">
+        <Paper withBorder p={6} radius="sm" style={active ? { borderColor: "var(--mantine-color-orange-6)", boxShadow: "0 0 0 1px var(--mantine-color-orange-6)", background: "var(--mantine-color-orange-0)" } : undefined}>
           <Group gap="xs" wrap="nowrap">
             <ItemThumb no={no} size={40} />
             <Stack gap={0} style={{ flex: 1, minWidth: 0 }}>
               <Group gap={6} justify="space-between" wrap="nowrap">
-                <Text size="sm" fw={600}>{it.short}</Text>
-                <Badge size="xs" variant="light" color={free > 0 ? "teal" : "gray"}>{free} free</Badge>
+                <Text size="sm" fw={600} truncate>{title}</Text>
+                <Badge size="xs" variant="light" color={free > 0 ? "teal" : "gray"} style={{ flex: "none" }}>{free} free</Badge>
               </Group>
-              <Text size="xs" c="dimmed" truncate>{it.w! / 100} × {it.d! / 100} m{it.rated ? "" : " · decorative"} · <ThomannLink no={no} /></Text>
+              <Text size="xs" c="dimmed" truncate>{subtitle}</Text>
             </Stack>
           </Group>
         </Paper>
@@ -52,9 +52,69 @@ function PlatformCard({ project, plan, a, no }: { project: Project; plan: Plan; 
   );
 }
 
+const NOT_OWNED = "You don't own any more of these. Add them in “Parts I own”, or turn on “Plan beyond what I own”.";
+
+function PlatformCard({ project, plan, a, no }: { project: Project; plan: Plan; a: Analysis; no: string }) {
+  const it = ITEMS[no];
+  const free = remaining(project, plan, a, no);
+  const usable = free > 0 || project.allowOverInventory;
+  return (
+    <PartCard no={no} title={it.short} free={free} usable={usable} dragNo={no}
+      subtitle={<>{it.w! / 100} × {it.d! / 100} m{it.rated ? "" : " · decorative"} · <ThomannLink no={no} /></>}
+      tooltip={usable ? "Click to add, or drag onto the plan" : NOT_OWNED}
+      onClick={() => usable ? addPlatform(project, plan, a, no) : notifications.show({ color: "orange", message: `You have no ${it.short} platforms left. Add more in “Parts I own”, or turn on “Plan beyond what I own”.` })} />
+  );
+}
+
+function RailCards({ project, plan, a }: { project: Project; plan: Plan; a: Analysis }) {
+  const railItem = useStore((s) => s.railItem);
+  return (
+    <>
+      <Text size="xs" fw={700} tt="uppercase" c="dimmed" mt={4}>Handrail to place</Text>
+      {CATALOGUE.filter((i) => i.group === "rail").map((it) => {
+        const free = remaining(project, plan, a, it.no);
+        const usable = free > 0 || project.allowOverInventory;
+        return (
+          <PartCard key={it.no} no={it.no} title={it.short} free={free} usable={usable} active={railItem === it.no}
+            subtitle={<>{it.name.replace("Stairville Tour Stage ", "")} · <ThomannLink no={it.no} /></>}
+            tooltip={usable ? `Click open edges to add ${it.short} handrails` : NOT_OWNED}
+            onClick={() => setRailItem(it.no)} />
+        );
+      })}
+    </>
+  );
+}
+
+function StairCards({ project, plan, a }: { project: Project; plan: Plan; a: Analysis }) {
+  const stairKind = useStore((s) => s.stairKind);
+  const freeOf = (items: string[]) => Math.min(...items.map((no) => remaining(project, plan, a, no)));
+  return (
+    <>
+      <Text size="xs" fw={700} tt="uppercase" c="dimmed" mt={4}>Stairs to place</Text>
+      <Tooltip label="Uses whichever stairs suit the height of the platform you click, preferring ones you own" multiline w={220} openDelay={300}>
+        <UnstyledButton onClick={() => setStairKind("auto")}>
+          <Paper withBorder p={8} radius="sm" style={stairKind === "auto" ? { borderColor: "var(--mantine-color-orange-6)", boxShadow: "0 0 0 1px var(--mantine-color-orange-6)", background: "var(--mantine-color-orange-0)" } : undefined}>
+            <Text size="sm" fw={600}>Pick for the stage height</Text>
+            <Text size="xs" c="dimmed">Chooses the right stairs for each platform</Text>
+          </Paper>
+        </UnstyledButton>
+      </Tooltip>
+      {STAIRS.map((k) => {
+        const free = freeOf(k.items);
+        const usable = free > 0 || project.allowOverInventory;
+        return (
+          <PartCard key={k.id} no={k.items[0]} title={k.short} free={free} usable={usable} active={stairKind === k.id}
+            subtitle={<>For {k.minHeight}–{k.maxHeight}cm · {k.items.map((no, i) => <span key={no}>{i ? " + " : ""}<ThomannLink no={no} /></span>)}</>}
+            tooltip={usable ? `Click an open edge to add ${k.label}` : NOT_OWNED}
+            onClick={() => setStairKind(k.id)} />
+        );
+      })}
+    </>
+  );
+}
+
 export function Palette({ project, plan, a, onVenues }: { project: Project; plan: Plan; a: Analysis; onVenues: () => void }) {
   const tool = useStore((s) => s.tool);
-  const stairKind = useStore((s) => s.stairKind);
   const platforms = CATALOGUE.filter((i) => i.group === "platform");
   const owned = platforms.filter((i) => (project.inventory[i.no] ?? 0) > 0);
   const others = platforms.filter((i) => !(project.inventory[i.no] ?? 0));
@@ -63,28 +123,35 @@ export function Palette({ project, plan, a, onVenues }: { project: Project; plan
   return (
     <Stack gap="sm">
       <SegmentedControl fullWidth size="xs" value={tool} onChange={(v) => setTool(v as Tool)} data={[
-        { value: "select", label: <Group gap={4} justify="center" wrap="nowrap"><IconHandClick size={14} />Move</Group> },
+        { value: "select", label: <Group gap={4} justify="center" wrap="nowrap"><IconLayoutGrid size={14} />Platforms</Group> },
         { value: "rail", label: <Group gap={4} justify="center" wrap="nowrap"><IconFence size={14} />Rails</Group> },
         { value: "stair", label: <Group gap={4} justify="center" wrap="nowrap"><IconStairs size={14} />Stairs</Group> },
       ]} />
-      {tool === "select" && <Tip>Drag platforms around. <b>R</b> rotates, <b>Delete</b> removes, <b>Shift</b>-click or Shift-drag selects several. Handrails and stairs fixed to a platform move with it. Drag empty space to pan; scroll to zoom.</Tip>}
-      {tool === "rail" && <Tip>Red dashed edges are open upstage edges and <b>must</b> have handrails. Amber ones are open sides: rail them if people could fall. Click an edge to add a 2m handrail (1m when 2m doesn't fit or you hold <b>Shift</b>); click a handrail to remove it.</Tip>}
-      {tool === "stair" && (
+      {tool === "select" && (
         <>
-          <Tip>Click an open edge to put stairs there; the edge doesn't need a handrail where the stairs are. Click stairs to remove them.</Tip>
-          <Select size="xs" label="Stairs" value={stairKind} onChange={(v) => v && setStairKind(v)} allowDeselect={false}
-            data={[{ value: "auto", label: "Pick for the stage height" }, ...STAIRS.map((s) => ({ value: s.id, label: `${s.label} · ${s.minHeight}–${s.maxHeight}cm` }))]} />
+          <Tip>Click or drag a platform onto the plan, then drag it around. <b>R</b> rotates, <b>Delete</b> removes, <b>Shift</b>-click or Shift-drag selects several. Handrails and stairs fixed to a platform move with it. Drag empty space to pan; scroll to zoom.</Tip>
+          <Text size="xs" fw={700} tt="uppercase" c="dimmed" mt={4}>Platforms you own</Text>
+          {owned.length ? owned.map((i) => <PlatformCard key={i.no} project={project} plan={plan} a={a} no={i.no} />) : <Text size="xs" c="dimmed">None yet: add them in “Parts I own”.</Text>}
+          {others.length > 0 && (
+            <Button size="xs" variant="subtle" color="gray" justify="space-between" rightSection={showOthers ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />} onClick={() => setShowOthers((v) => !v)}>
+              {showOthers ? "Hide" : "Show"} {others.length} other Tour Stage platforms
+            </Button>
+          )}
+          {showOthers && others.map((i) => <PlatformCard key={i.no} project={project} plan={plan} a={a} no={i.no} />)}
         </>
       )}
-
-      <Text size="xs" fw={700} tt="uppercase" c="dimmed" mt={4}>Platforms you own</Text>
-      {owned.length ? owned.map((i) => <PlatformCard key={i.no} project={project} plan={plan} a={a} no={i.no} />) : <Text size="xs" c="dimmed">None yet: add them in “Parts I own”.</Text>}
-      {others.length > 0 && (
-        <Button size="xs" variant="subtle" color="gray" justify="space-between" rightSection={showOthers ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />} onClick={() => setShowOthers((v) => !v)}>
-          {showOthers ? "Hide" : "Show"} {others.length} other Tour Stage platforms
-        </Button>
+      {tool === "rail" && (
+        <>
+          <Tip>Red dashed edges are open upstage edges and <b>must</b> have handrails. Amber ones are open sides: rail them if people could fall. Pick a handrail below, then click an edge to add it; click a handrail on the plan to remove it.</Tip>
+          <RailCards project={project} plan={plan} a={a} />
+        </>
       )}
-      {showOthers && others.map((i) => <PlatformCard key={i.no} project={project} plan={plan} a={a} no={i.no} />)}
+      {tool === "stair" && (
+        <>
+          <Tip>Pick stairs below, then click an open edge to put them there; the edge doesn't need a handrail where the stairs are. Click stairs on the plan to remove them.</Tip>
+          <StairCards project={project} plan={plan} a={a} />
+        </>
+      )}
 
       <Text size="xs" fw={700} tt="uppercase" c="dimmed" mt={4}>Plan settings</Text>
       <Select size="xs" label="Audience is at the" value={plan.audience} allowDeselect={false}

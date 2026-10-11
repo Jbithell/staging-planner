@@ -6,7 +6,7 @@ A guide for AI coding agents (and humans) working on this repository.
 
 **Tour Stage Planner** is a client-only React app for laying out a **Stairville Tour Stage** deck. It is deliberately specific to that one system: the catalogue, leg heights, rail lengths and rules all come from Thomann's Tour Stage range and the Tour Stage assembly instructions. Don't generalise it to other staging systems.
 
-1. **Parts I own** (`InventoryModal`): packs owned of every catalogue item. Plans are limited to this unless `allowOverInventory` is on.
+1. **Parts I own** (`InventoryModal`): single pieces owned of every catalogue part. Plans are limited to this unless `allowOverInventory` is on.
 2. **Design** (`PlanView`): drag platforms on a grid or on a scaled floor-plan image (a `Venue`), set legs, add handrails and stairs.
 3. **Checks** (`lib/analysis.ts`): overlaps, open edges that need handrails, wheels on joined platforms, stairs that don't fit, and so on.
 4. **Build sheet** (`BuildSheet`): printable pick list and numbered drawings for the crew.
@@ -23,7 +23,7 @@ npm run build      # tsc -b (typecheck) + vite build → dist/
 npm run preview    # serve dist/ locally
 ```
 
-There is no test suite or linter configured. `npm run build` must pass before you push, because it is what CI runs. For UI changes, drive the built app in a headless browser (Playwright/Chromium) and look at screenshots. The example plans (`src/samples.ts`) are the hand-drawn layouts the app was built from; they make good test fixtures.
+There is no test suite or linter configured. `npm run build` must pass before you push, because it is what CI runs. For UI changes, drive the built app in a headless browser (Playwright/Chromium) and look at screenshots. The example plans (`src/samples.ts`) make good test fixtures.
 
 ## Deployment
 
@@ -44,10 +44,11 @@ The footer shows the short git commit SHA of the build, and hovering it shows th
 
 ```
 src/
-  catalogue.ts      the Tour Stage range: items (item no., Thomann page, price, weight, pack size, shape/height),
-                    DEFAULT_INVENTORY (from the invoice), STAIRS (stair builds), thomannUrl/imageUrl
+  catalogue.ts      the Tour Stage range: parts (item no., Thomann page, weight per piece, other pack item numbers,
+                    shape/height), DEFAULT_INVENTORY (first-run quantities), V1_PACKS (file migration),
+                    STAIRS (stair builds), thomannUrl/imageUrl
   types.ts          data model (read this first)
-  samples.ts        example plans (Aristocats, Thrust, Rats) and the default project
+  samples.ts        example plans (one long stage, thrust, two stages with tiers) and the default project
   store.ts          zustand store: project, undo/redo, view/tool/selection, updatePlan (inventory guard)
   storage.ts        localStorage save/load, download/upload JSON, floor-plan image compression
   lib/
@@ -81,12 +82,15 @@ src/
   - Stairs exempt the edge they cover.
   - Diagonal or curved edges can't take straight rails, so they only warn.
 - Facing comes from `plan.audience` (which side of the drawing the audience is on).
-- **Inventory** counts packs (`Item.pack`, e.g. leg sets of 4). Plans count pieces. Interchangeable items (assembly clamp packs) share one BOM line via `Need.items`.
+- **Everything is counted in single pieces**, never packs. Thomann sells some parts in sets or packs of several sizes, and pieces get broken and binned, so pack counts don't tell you what someone has. A part's `no` is the item number used for its link and photo; other pack sizes are listed in `Item.also` for links only.
+- **No prices.** They go out of date fast; link to Thomann instead.
+- Don't add anything that identifies a real order, customer or production (invoice numbers, show names) to the code or docs.
 - **Every change to a plan goes through `updatePlan`.** When `allowOverInventory` is off, it refuses any change that makes a hard shortfall worse (platforms, legs, Rollrisers, rails, stairs). Connector estimates never block a change.
 - Project-level changes go through `setProject` (undoable by default; text fields pass `false`).
 - **Autosave**: `components/Autosave.tsx` saves to localStorage after 800ms idle and immediately on blur/hide/unload. A `QuotaExceededError` shows "Save failed – download your file!". Don't add other save timers.
 - **localStorage keys**: `tsp:project`, `tsp:seenHelp`, `tsp:showOtherPlatforms`.
-- **File format**: `{ format: "tour-stage-planner", version: 1, exportedAt, project }`. New fields must be optional with defaults in `parseProject`. Only bump `version` for breaking changes.
+- **Tools**: Platforms (`select`), Rails and Stairs. The Rails and Stairs palettes show cards for the handrail (`railItem`) or stairs (`stairKind`, or `auto`) the tool places; don't hide choices behind modifier keys.
+- **File format**: `{ format: "tour-stage-planner", version: 2, exportedAt, project }`. Version 1 counted packs; `readInventory` converts it to pieces using `V1_PACKS` and drops parts no longer in the catalogue. New fields must be optional with defaults in `parseProject`. Only bump `version` for breaking changes.
 - **Thomann links and images**: `thomannUrl(item)` uses `Item.page` when known, otherwise a Thomann search for the item number. Photos are hotlinked from `thumbs.static-thomann.de` and never stored. `ItemThumb` falls back to an icon when offline.
 - **UI**: Mantine components, not custom CSS. Every tool has a `Tip`, controls have tooltips, and destructive actions use `modals.openConfirmModal` and say whether they can be undone.
 - **Logging**: `log(area, …)` from `src/log.ts` (`[TSP]` prefix).
@@ -95,5 +99,5 @@ src/
 ## Checklist before pushing
 
 1. `npm run build` passes.
-2. For UI changes: `npm run preview`, open the example plans in a headless browser and check screenshots. Aristocats should have no issues and need 10×2x1, 40 legs 30cm, 7×2m rails.
+2. For UI changes: `npm run preview`, open the example plans in a headless browser and check screenshots. “One long stage” should have no issues and need 10×2x1, 40 legs 30cm, 7×2m rails.
 3. Download → Open file round-trips any new fields.

@@ -26,14 +26,13 @@ function SaveIndicator() {
 function HelpModal({ opened, onClose }: { opened: boolean; onClose: () => void }) {
   const rows: [string, React.ReactNode][] = [
     ["Undo / redo", <><Kbd>Ctrl</Kbd>+<Kbd>Z</Kbd> / <Kbd>Ctrl</Kbd>+<Kbd>Shift</Kbd>+<Kbd>Z</Kbd></>],
-    ["Tools", <><Kbd>M</Kbd> move · <Kbd>H</Kbd> handrails · <Kbd>S</Kbd> stairs</>],
+    ["Tools", <><Kbd>P</Kbd> platforms · <Kbd>H</Kbd> handrails · <Kbd>S</Kbd> stairs</>],
     ["Rotate selection", <Kbd>R</Kbd>],
     ["Delete selection", <><Kbd>Delete</Kbd> / <Kbd>Backspace</Kbd></>],
     ["Nudge selection by one grid step", "Arrow keys"],
     ["Select several", <><Kbd>Shift</Kbd>-click, or <Kbd>Shift</Kbd>-drag a box</>],
     ["Select all / none", <><Kbd>Ctrl</Kbd>+<Kbd>A</Kbd> / <Kbd>Esc</Kbd></>],
     ["Pan / zoom / fit", <>Drag empty space · mouse wheel · <Kbd>0</Kbd></>],
-    ["1m handrail instead of 2m", <>Hold <Kbd>Shift</Kbd> with the handrail tool</>],
   ];
   return (
     <Modal opened={opened} onClose={onClose} title={<Title order={4}>How this works</Title>} size="lg">
@@ -43,7 +42,7 @@ function HelpModal({ opened, onClose }: { opened: boolean; onClose: () => void }
           <List.Item><b>Parts I own</b>: check the quantities. Plans can only use what's listed there, unless you turn on <i>Plan beyond what I own</i>.</List.Item>
           <List.Item><b>Floor plan</b> (optional): add an image of the room and set its scale, so the stage is drawn to scale on it.</List.Item>
           <List.Item><b>Platforms</b>: click or drag them from the left, move them around and pick their legs (height) on the right.</List.Item>
-          <List.Item><b>Handrails</b>: open upstage edges <span style={{ color: "#e03131" }}>(red)</span> must be railed; open sides <span style={{ color: "#f08c00" }}>(amber)</span> are a warning. Above 80cm every open edge needs rails.</List.Item>
+          <List.Item><b>Handrails</b>: pick a 2m or 1m handrail under <i>Rails</i>, then click edges. Open upstage edges <span style={{ color: "#e03131" }}>(red)</span> must be railed; open sides <span style={{ color: "#f08c00" }}>(amber)</span> are a warning. Above 80cm every open edge needs rails.</List.Item>
           <List.Item><b>Build sheet</b>: a printable pick list and step-by-step drawings for the people putting it up. <b>Parts</b> lists everything needed and what to buy.</List.Item>
         </List>
         <Text size="sm">Everything saves in this browser. Use <b>Download file</b> in the plan menu to back up or move to another computer; clearing browser data deletes your plans.</Text>
@@ -79,7 +78,7 @@ export default function App() {
       if (mod && e.key.toLowerCase() === "a") { e.preventDefault(); select([...pl.platforms, ...pl.rails, ...pl.stairs].map((x) => x.id)); return; }
       if (mod || st.view !== "design") return;
       const k = e.key.toLowerCase();
-      if (k === "m") setTool("select");
+      if (k === "p" || k === "m") setTool("select");
       else if (k === "h") setTool("rail");
       else if (k === "s") setTool("stair");
       else if (k === "escape") select([]);

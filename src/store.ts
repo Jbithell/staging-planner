@@ -3,7 +3,7 @@ import { notifications } from "@mantine/notifications";
 import type { Plan, Project, Tool, View } from "./types";
 import { ITEMS } from "./catalogue";
 import { analyse } from "./lib/analysis";
-import { bom, hardShort, packOf } from "./lib/bom";
+import { bom, hardShort } from "./lib/bom";
 import { loadProject, saveProject } from "./storage";
 import { emptyPlan } from "./samples";
 import { uid } from "./lib/util";
@@ -19,6 +19,8 @@ interface State {
   view: View;
   tool: Tool;
   stairKind: string;
+  /** Handrail the rail tool places. */
+  railItem: string;
   selection: string[];
 }
 
@@ -29,7 +31,8 @@ export const useStore = create<State>(() => ({
   saveState: "saved",
   view: "design",
   tool: "select",
-  stairKind: "ix-1",
+  stairKind: "auto",
+  railItem: "485819",
   selection: [],
 }));
 
@@ -73,8 +76,8 @@ export function updatePlan(fn: (pl: Plan) => Plan, undoable = true): boolean {
     const after = hardShort(project, next, analyse(next));
     const worse = Object.keys(after).filter((k) => after[k] > (before[k] ?? 0));
     if (worse.length) {
-      const lines = bom(project, next, analyse(next)).filter((l) => worse.includes(l.key));
-      const what = lines.map((l) => `${ITEMS[l.items[0]]?.short ?? l.label} (you own ${l.ownedPieces}${packOf(l.items[0]) > 1 ? " pieces" : ""}, this needs ${l.pieces})`).join(", ");
+      const lines = bom(project, next, analyse(next)).filter((l) => worse.includes(l.no));
+      const what = lines.map((l) => `${ITEMS[l.no]?.short ?? l.label} (you own ${l.ownedPieces}, this needs ${l.pieces})`).join(", ");
       notifications.show({ color: "red", title: "Not enough parts", message: `${what}. Add them in Parts I own, or turn on “Plan beyond what I own”.` });
       log("plan", "refused: not enough", worse);
       return false;
@@ -100,6 +103,7 @@ export const select = (ids: string[]) => set({ selection: ids });
 export const setView = (view: View) => set({ view });
 export const setTool = (tool: Tool) => set({ tool, selection: tool === "select" ? get().selection : [] });
 export const setStairKind = (stairKind: string) => set({ stairKind });
+export const setRailItem = (railItem: string) => set({ railItem });
 
 export function openPlan(id: string) {
   setProject((p) => ({ ...p, activePlanId: id }), false);

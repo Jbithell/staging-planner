@@ -1,17 +1,29 @@
 import type { Plan, Project, Venue } from "./types";
-import { DEFAULT_INVENTORY } from "./catalogue";
+import { DEFAULT_INVENTORY, ITEMS, V1_PACKS } from "./catalogue";
 import { defaultProject } from "./samples";
 import { log } from "./log";
 
 const KEY = "tsp:project";
 export const FORMAT = "tour-stage-planner";
-const VERSION = 1;
+const VERSION = 2;
 
 export function serialiseProject(p: Project) {
   return JSON.stringify({ format: FORMAT, version: VERSION, exportedAt: new Date().toISOString(), project: p });
 }
 
 const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+/** Single pieces per part. Version 1 counted packs (leg sets of 4, clamp packs of 4/10/20…). */
+function readInventory(raw: unknown, version: number): Record<string, number> {
+  const out: Record<string, number> = Object.fromEntries(Object.keys(DEFAULT_INVENTORY).map((k) => [k, 0]));
+  for (const [no, n] of Object.entries((raw ?? {}) as Record<string, unknown>)) {
+    const qty = Math.max(0, Math.floor(Number(n) || 0));
+    const [part, per] = version < 2 ? V1_PACKS[no] ?? [no, 1] : [no, 1];
+    if (!ITEMS[part]) continue; // parts no longer in the catalogue
+    out[part] = (version < 2 ? out[part] ?? 0 : 0) + qty * per; // v1 packs of different sizes add up to one part
+  }
+  return out;
+}
 
 /** Validates loosely and fills defaults, so files from older versions keep loading. */
 export function parseProject(text: string): Project {
@@ -26,7 +38,7 @@ export function parseProject(text: string): Project {
   if (!plans.length) throw new Error("The file has no plans");
   const venues: Venue[] = arr<Venue>(p.venues).filter((v) => typeof v.image === "string");
   return {
-    inventory: { ...Object.fromEntries(Object.keys(DEFAULT_INVENTORY).map((k) => [k, 0])), ...(p.inventory ?? {}) },
+    inventory: readInventory(p.inventory, data.version),
     allowOverInventory: !!p.allowOverInventory,
     gridCm: Number(p.gridCm) || 50,
     venues,
