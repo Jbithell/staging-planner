@@ -132,9 +132,9 @@ function PartsSummary({ project, plan, a }: { project: Project; plan: Plan; a: A
       <Table.Thead><Table.Tr><Table.Th>Part</Table.Th><Table.Th ta="right">Need</Table.Th><Table.Th ta="right">Own</Table.Th></Table.Tr></Table.Thead>
       <Table.Tbody>
         {lines.map((l) => (
-          <Table.Tr key={l.key}>
+          <Table.Tr key={l.no}>
             <Table.Td>
-              <Tooltip label={l.why ?? l.label} openDelay={300}><span>{ITEMS[l.items[0]]?.short ?? l.label}{l.estimate ? " *" : ""}</span></Tooltip>
+              <Tooltip label={l.why ?? l.label} openDelay={300}><span>{ITEMS[l.no]?.short ?? l.label}{l.estimate ? " *" : ""}</span></Tooltip>
             </Table.Td>
             <Table.Td ta="right">{l.pieces}</Table.Td>
             <Table.Td ta="right">

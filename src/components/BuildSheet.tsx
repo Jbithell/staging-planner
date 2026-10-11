@@ -3,7 +3,7 @@ import { IconPrinter } from "@tabler/icons-react";
 import { FLOOR, ITEMS, STAIR_KINDS } from "../catalogue";
 import type { Plan, Project } from "../types";
 import type { Analysis } from "../lib/analysis";
-import { bom, packOf } from "../lib/bom";
+import { bom } from "../lib/bom";
 import { OPPOSITE, SIDE_VEC, bbox, footprint, railEnds, type Pt } from "../lib/geometry";
 import { Drawing, RAIL_COLOUR, contentBox, heightColour } from "./Drawing";
 import { railOwners } from "./PlanView";
@@ -78,18 +78,16 @@ export function BuildSheet({ project, plan, a }: { project: Project; plan: Plan;
         {a.issues.some((i) => i.level === "error") && <Badge color="red" mb="sm">{(() => { const n = a.issues.filter((i) => i.level === "error").length; return `This plan still has ${n} problem${n > 1 ? "s" : ""} — check it before building`; })()}</Badge>}
         <Title order={4} mb={4}>Pick list</Title>
         <Table fz="sm" verticalSpacing={3}>
-          <Table.Thead><Table.Tr><Table.Th /><Table.Th>Part</Table.Th><Table.Th>Item no.</Table.Th><Table.Th ta="right">Pieces</Table.Th><Table.Th ta="right">Packs</Table.Th><Table.Th /></Table.Tr></Table.Thead>
+          <Table.Thead><Table.Tr><Table.Th /><Table.Th>Part</Table.Th><Table.Th>Item no.</Table.Th><Table.Th ta="right">Pieces</Table.Th><Table.Th /></Table.Tr></Table.Thead>
           <Table.Tbody>
             {lines.map((l) => {
-              const no = l.items.find((i) => (project.inventory[i] ?? 0) > 0) ?? l.items[0];
-              const pack = packOf(no);
+              const no = l.no;
               return (
-                <Table.Tr key={l.key}>
+                <Table.Tr key={l.no}>
                   <Table.Td w={44}><ItemThumb no={no} size={34} /></Table.Td>
                   <Table.Td>{ITEMS[no]?.name ?? l.label}{l.estimate && <Text span size="xs" c="dimmed"> (estimate)</Text>}</Table.Td>
                   <Table.Td><ThomannLink no={no} /></Table.Td>
                   <Table.Td ta="right"><b>{l.pieces}</b></Table.Td>
-                  <Table.Td ta="right">{pack > 1 ? `${Math.ceil(l.pieces / pack)} × ${pack}` : "–"}</Table.Td>
                   <Table.Td>{l.shortPieces > 0 && <Badge size="xs" color="red" variant="light">{l.shortPieces} not owned</Badge>}</Table.Td>
                 </Table.Tr>
               );

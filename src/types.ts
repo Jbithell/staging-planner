@@ -65,7 +65,7 @@ export interface Plan {
 }
 
 export interface Project {
-  /** Packs owned per catalogue item number. */
+  /** Single pieces owned per catalogue item number. */
   inventory: Record<string, number>;
   allowOverInventory: boolean;
   gridCm: number;

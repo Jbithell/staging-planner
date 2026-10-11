@@ -64,20 +64,16 @@ function nearestOpenUnit(a: Analysis, p: Pt, maxDist: number) {
   return best;
 }
 
-export function railCandidate(project: Project, plan: Plan, a: Analysis, p: Pt, scale: number, forceShort: boolean): Rail | null {
+/** Where the chosen handrail would go on the open edge nearest `p`; "too-long" when that edge is shorter than it. */
+export function railCandidate(a: Analysis, p: Pt, scale: number, item: string): Rail | "too-long" | null {
   const u = nearestOpenUnit(a, p, Math.max(15, 24 / scale));
   if (!u) return null;
   const [lo, hi] = openRun(u, a);
   const ax = u.axis === "h" ? 0 : 1;
-  const lengths = forceShort ? ["485812"] : ["485819", "485812"];
-  for (const no of lengths) {
-    const L = ITEMS[no].w!;
-    if (hi - lo < L - 0.5) continue;
-    if (!project.allowOverInventory && remaining(project, plan, a, no) < 1 && no !== lengths[lengths.length - 1]) continue;
-    const start = Math.min(hi - L, Math.max(lo, snap(p[ax] - L / 2, 50)));
-    return u.axis === "h" ? { id: uid(), item: no, x: start, y: u.mid[1], dir: "h" } : { id: uid(), item: no, x: u.mid[0], y: start, dir: "v" };
-  }
-  return null;
+  const L = ITEMS[item]?.w ?? 200;
+  if (hi - lo < L - 0.5) return "too-long";
+  const start = Math.min(hi - L, Math.max(lo, snap(p[ax] - L / 2, 50)));
+  return u.axis === "h" ? { id: uid(), item, x: start, y: u.mid[1], dir: "h" } : { id: uid(), item, x: u.mid[0], y: start, dir: "v" };
 }
 
 /** Picks a stair for the stage height: the chosen kind, or (auto) one that fits, preferring stairs that are owned. */
@@ -124,9 +120,9 @@ export function PlanView({ project, plan, a }: { project: Project; plan: Plan; a
   const [drag, setDrag] = useState<Drag | null>(null);
   const [moveOffset, setMoveOffset] = useState<{ dx: number; dy: number; bad: boolean } | null>(null);
   const [hover, setHover] = useState<Pt | null>(null);
-  const [shift, setShift] = useState(false);
   const tool = useStore((s) => s.tool);
   const stairKind = useStore((s) => s.stairKind);
+  const railItem = useStore((s) => s.railItem);
   const selection = useStore((s) => s.selection);
   const venue = project.venues.find((v) => v.id === plan.venueId);
   const fitted = useRef("");
@@ -146,13 +142,6 @@ export function PlanView({ project, plan, a }: { project: Project; plan: Plan; a
   useEffect(() => {
     if (width && height) viewState.centre = [(width / 2 - view.tx) / view.s, (height / 2 - view.ty) / view.s];
   }, [view, width, height]);
-
-  useEffect(() => {
-    const kd = (e: KeyboardEvent) => setShift(e.shiftKey);
-    window.addEventListener("keydown", kd);
-    window.addEventListener("keyup", kd);
-    return () => { window.removeEventListener("keydown", kd); window.removeEventListener("keyup", kd); };
-  }, []);
 
   const toRoom = (cx: number, cy: number): Pt => {
     const r = svgRef.current!.getBoundingClientRect();
@@ -177,7 +166,8 @@ export function PlanView({ project, plan, a }: { project: Project; plan: Plan; a
     return () => el.removeEventListener("wheel", wheel);
   }, [width, height]);
 
-  const railPreview = useMemo(() => (tool === "rail" && hover && !drag ? railCandidate(project, plan, a, hover, view.s, shift) : null), [tool, hover, drag, project, plan, a, view.s, shift]);
+  const railHit = useMemo(() => (tool === "rail" && hover && !drag ? railCandidate(a, hover, view.s, railItem) : null), [tool, hover, drag, a, view.s, railItem]);
+  const railPreview = railHit && railHit !== "too-long" ? railHit : null;
   const stairPreview = useMemo(() => (tool === "stair" && hover && !drag ? stairCandidate(project, a, hover, view.s, stairKind) : null), [tool, hover, drag, project, a, view.s, stairKind]);
 
   /** Everything that moves when the selection is dragged: selected items plus rails and stairs fixed to selected platforms. */
@@ -227,7 +217,8 @@ export function PlanView({ project, plan, a }: { project: Project; plan: Plan; a
 
     if (tool === "rail") {
       if (rid) { updatePlan((pl) => ({ ...pl, rails: pl.rails.filter((r) => r.id !== rid) })); return; }
-      const c = railCandidate(project, plan, a, p, view.s, e.shiftKey);
+      const c = railCandidate(a, p, view.s, railItem);
+      if (c === "too-long") { notifications.show({ color: "orange", message: `A ${ITEMS[railItem]?.short} handrail is too long for that edge. Pick a shorter one on the left.` }); return; }
       if (c) { if (updatePlan((pl) => ({ ...pl, rails: [...pl.rails, c] }))) log("plan", "rail added", ITEMS[c.item].short); return; }
     } else if (tool === "stair") {
       if (sid) { updatePlan((pl) => ({ ...pl, stairs: pl.stairs.filter((s) => s.id !== sid) })); return; }
@@ -362,7 +353,7 @@ export function PlanView({ project, plan, a }: { project: Project; plan: Plan; a
       {hover && (
         <Text pos="absolute" bottom={16} left={12} size="xs" c="dimmed" className="no-print">
           {(hover[0] / 100).toFixed(2)} m, {(hover[1] / 100).toFixed(2)} m
-          {tool === "rail" && " · click an open edge to add a handrail (Shift for 1m), click a handrail to remove it"}
+          {tool === "rail" && (railHit === "too-long" ? ` · a ${ITEMS[railItem]?.short} handrail is too long for this edge` : ` · click an open edge to add a ${ITEMS[railItem]?.short} handrail, click a handrail to remove it`)}
           {tool === "stair" && " · click an open edge to add stairs, click stairs to remove them"}
         </Text>
       )}
